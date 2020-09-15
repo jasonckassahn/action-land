@@ -6,7 +6,7 @@ const matchToRoom = (socket, io) => {
   if (roomId) {
     socket.join(roomId, () => {
       console.log('player 2 room list:', socket.rooms);
-      socket.emit('join info', [roomId, 2]);
+      socket.emit('join info', [roomId, 0]);
       io.to(roomId).send('Game joined');
       playGame(socket, io, roomId);
       roomId = null;
