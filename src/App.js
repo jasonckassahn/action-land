@@ -19,14 +19,17 @@ class App extends React.Component {
       firstPlayerCharge: 0,
       secondPlayerCharge: 0,
       firstPlayerHealth: 12,
-      secondPlayerHealth: 12
+      secondPlayerHealth: 12,
+      stood: false,
+      opponentStood: false,
+      winningPlayer: null
     }
     this.handleCharge = this.handleCharge.bind(this);
+    this.handleStand = this.handleStand.bind(this);
+    this.resetTurn = this.resetTurn.bind(this);
   }
 
   componentDidMount() {
-    // axios.get('/api/test')
-    //   .then((res) => this.setState({test: res.data}))
     socket.on('connect', () => {
       socket.on('message', (res) => this.setState({status: res}))
       socket.on('join info', (info) => {
@@ -37,20 +40,71 @@ class App extends React.Component {
         this.setState(initialState);
       });
 
-      socket.on('attackVal', (val, player) => {
+      socket.on('attackVal', (val, player, charge) => {
         let turnNum = this.state.turn + 1;
         let stateChanges = { attack: val, turn: turnNum };
         if (turnNum % 2 === this.state.player) {
           stateChanges.activePlayer = true;
         }
+        if (charge > 12) {
+          charge = 13;
+          socket.emit('damage', this.state.firstPlayerCharge, this.state.secondPlayerCharge, player)
+        }
         if (player === 1) {
-          stateChanges.firstPlayerCharge = this.state.firstPlayerCharge + val > 12 ? 13 : this.state.firstPlayerCharge + val;
+          stateChanges.firstPlayerCharge = charge;
         } else {
-          stateChanges.secondPlayerCharge = this.state.secondPlayerCharge + val > 12 ? 13 : this.state.secondPlayerCharge + val;
+          stateChanges.secondPlayerCharge = charge;
         }
         this.setState(stateChanges);
-        console.log('attack on client', val);
+        if (this.state.stood) {
+          socket.emit('stand', this.state.player);
+        }
       });
+
+      socket.on('stood', (player) => {
+        console.log('player', player, 'stood')
+        let turnNum = this.state.turn + 1;
+        let stateChanges = { turn: turnNum };
+        if (turnNum % 2 === this.state.player) {
+          stateChanges.activePlayer = true;
+        }
+        if (player !== this.state.player) {
+          stateChanges.opponentStood = true;
+        }
+        this.setState(stateChanges);
+      })
+
+      socket.on('damageTo1', (damage) => {
+        let newHealth = this.state.firstPlayerHealth - damage;
+        if (newHealth < 1) {
+          newHealth = 0;
+          socket.emit('winner', 0)
+        }
+        this.setState({
+          firstPlayerHealth: newHealth
+        })
+        setTimeout(this.resetTurn, 2000);
+      })
+
+      socket.on('damageTo2', (damage) => {
+        let newHealth = this.state.secondPlayerHealth - damage;
+        if (newHealth < 1) {
+          newHealth = 0;
+          socket.emit('winner', 1)
+        }
+        this.setState({
+          secondPlayerHealth: newHealth
+        })
+        setTimeout(this.resetTurn, 2000);
+      })
+
+      socket.on('tie', () => {
+        setTimeout(this.resetTurn, 2000);
+      })
+
+      socket.on('winner', (player) => {
+        this.setState({winningPlayer: player})
+      })
     })
   }
 
@@ -63,28 +117,40 @@ class App extends React.Component {
     this.setState({activePlayer: false});
   }
 
+  handleStand() {
+    if (this.state.opponentStood) {
+      socket.emit('damage', this.state.firstPlayerCharge, this.state.secondPlayerCharge);
+    } else {
+      socket.emit('stand', this.state.player);
+    }
+    this.setState({stood: true});
+  }
+
+  resetTurn() {
+    this.setState({
+      stood: false,
+      opponentStood: false,
+      attack: 0,
+      firstPlayerCharge: 0,
+      secondPlayerCharge: 0,
+      activePlayer: this.state.turn % 2 === this.state.player
+    })
+    socket.emit('reset');
+  }
+
   render() {
     let roomInfo = this.state.player ? <p>Player {this.state.player} joined room: {this.state.roomId}</p> : '';
-    // const numberDeck = <button onClick={this.handleCharge} disabled={this.state.activePlayer}>Charge Up</button>;
-    // let attackVal = this.state.attack ? <p>{this.state.attack}</p> : '';
-    // let game =
-    //   <div>
-    //     {numberDeck}
-    //     {attackVal}
-    //   </div>
-    // let board =  game
     let intro = <div>
         <button onClick={this.handleFind}>Find Game</button>
-        <img src={logo} className="App-logo" alt="logo" />
         <p>{this.state.status}</p>
+        <img src={logo} className="App-logo" alt="logo" />
         {roomInfo}
       </div>;
 
     return (
       <div className="App">
         <header className="App-header">
-          {this.state.status === 'Game joined' ? <Gameboard gameState={this.state} handleCharge={this.handleCharge} /> : intro}
-          {/* {board} */}
+          {this.state.status === 'Game joined' ? <Gameboard gameState={this.state} handleCharge={this.handleCharge} handleStand={this.handleStand} /> : intro}
         </header>
       </div>
     );
