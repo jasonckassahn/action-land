@@ -1,0 +1,33 @@
+.chargeMeter {
+  height: 25vh;
+}
+
+.healthBar {
+  width: 40vw;
+}
+
+.deck {
+  height: 15vh;
+}
+
+.deckDisabled {
+  height: 15vh;
+  filter: brightness(50%);
+}
+
+.deckOverlay {
+  width: 10vw;
+}
+
+.attack {
+  height: 10vh;
+}
+
+.attackDisabled {
+  height: 10vh;
+  filter: brightness(50%);
+}
+
+.hidden {
+  display: none;
+}
